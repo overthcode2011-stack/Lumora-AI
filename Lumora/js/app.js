@@ -1,6 +1,6 @@
 import {loadRules,systemPrompt,attachment,crisis,rules} from "./rules.js";
 import {loadMemory,learn,recall,exportLua,hasPII} from "./memory.js";
-import {pick,stream} from "./engine.js";
+import {pick,stream,getNivel,setNivel} from "./engine.js";
 const $=id=>document.getElementById(id);
 const ic=(n,c="")=>`<svg class="i ${c}"><use href="#i-${n}"/></svg>`;
 const K="lumora_chats",BYE="Este chat se eliminó: Lumora AI no crea vínculos afectivos. Puedes empezar uno nuevo para seguir con tus proyectos.";
@@ -83,7 +83,7 @@ async function generate(){
  renderBody("",body,true);$("msgs").appendChild(w);$("msgs").scrollTop=$("msgs").scrollHeight;
  let full="";ctrl=new AbortController();
  try{
-  await stream(model,msgs,t=>{full+=t;renderBody(full,body,true);$("msgs").scrollTop=$("msgs").scrollHeight;},ctrl.signal);
+  await stream(model,msgs,t=>{full+=t;renderBody(full,body,true);$("msgs").scrollTop=$("msgs").scrollHeight;},ctrl.signal,x=>{$("st").textContent=x;});
   for(const t of full.matchAll(/\[\[APRENDER:\s*([\s\S]*?)\]\]/g))learn(t[1]);
   c.msgs.push({role:"assistant",content:full});save();
   if(/\[\[FIN_CHAT\]\]/.test(full)&&!crisis(q))return del(c,BYE);
@@ -124,6 +124,7 @@ $("ds").onclick=exportData;
 $("form").onsubmit=e=>{e.preventDefault();submit();};
 $("in").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();submit();}};
 $("in").oninput=e=>{e.target.style.height="48px";e.target.style.height=Math.min(e.target.scrollHeight,160)+"px";};
+$("nivel").value=getNivel();$("nivel").onchange=e=>{setNivel(e.target.value);location.reload();};
 $("new").onclick=newChat;$("q").oninput=drawList;$("exp").onclick=exportLua;
 $("menu").onclick=()=>$("side").classList.toggle("open");$("dev").textContent=device();
 (async()=>{

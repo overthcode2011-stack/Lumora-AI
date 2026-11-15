@@ -4,7 +4,8 @@ import {pick,stream} from "./engine.js";
 const $=id=>document.getElementById(id);
 const ic=(n,c="")=>`<svg class="i ${c}"><use href="#i-${n}"/></svg>`;
 const K="lumora_chats",BYE="Este chat se eliminó: Lumora AI no crea vínculos afectivos. Puedes empezar uno nuevo para seguir con tus proyectos.";
-let chats=[],cur=null,busy=false,model=null,ctrl=null;
+let chats=[],cur=null,busy=false,model=null,ctrl=null,modelError="";
+function add_err(){const n=el("div","notice");n.textContent="No se pudo iniciar el motor: "+modelError;$("msgs").appendChild(n);}
 try{chats=JSON.parse(localStorage.getItem(K))||[];}catch{}
 const save=()=>{try{localStorage.setItem(K,JSON.stringify(chats));}catch{}};
 const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
@@ -83,7 +84,7 @@ async function generate(){
   c.msgs.push({role:"assistant",content:full});save();
   if(/\[\[FIN_CHAT\]\]/.test(full)&&!crisis(q))return del(c,BYE);
  }catch(e){
-  c.msgs.push({role:"assistant",content:"No pude generar la respuesta: "+(/Failed to fetch|NetworkError/.test(e.message)?"no encuentro Ollama. Instálalo, inicia el servicio y permite este sitio con OLLAMA_ORIGINS.":e.message)});save();
+  c.msgs.push({role:"assistant",content:"No pude generar la respuesta: "+e.message});save();
  }finally{busy=false;$("send").disabled=false;if(cur===c)show(c);}
 }
 async function submit(){
@@ -94,7 +95,7 @@ async function submit(){
  cur.msgs.push({role:"user",content:text});
  if(attachment(text)&&!crisis(text)&&++cur.strikes>=rules().strikes)return del(cur,BYE);
  save();
- if(!model){cur.msgs.push({role:"assistant",content:"Todavía no hay un modelo conectado. Revisa que Ollama esté instalado y en ejecución."});save();return show(cur);}
+ if(!model){cur.msgs.push({role:"assistant",content:"Todavía no hay un modelo listo. "+(modelError||"Espera a que termine de cargar (mira el estado arriba a la derecha).")});save();return show(cur);}
  show(cur);await generate();
 }
 function retry(){if(busy||!cur)return;cur.msgs.pop();save();show(cur);generate();}
@@ -120,5 +121,5 @@ $("new").onclick=newChat;$("q").oninput=drawList;$("exp").onclick=exportLua;
 $("menu").onclick=()=>$("side").classList.toggle("open");$("dev").textContent=device();
 (async()=>{
  await Promise.all([loadRules(),loadMemory()]);show(null);
- try{model=await pick();$("st").textContent=model||"Sin modelos";$("dot").className=model?"ok":"";}catch{$("st").textContent="Ollama no responde";}
+ $("send").disabled=true;try{model=await pick(t=>$("st").textContent=t);$("st").textContent=model||"Sin modelos";$("dot").className=model?"ok":"";}catch(e){$("st").textContent="Sin motor";modelError=e.message;add_err();}$("send").disabled=false;
 })();

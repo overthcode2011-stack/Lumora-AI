@@ -29,7 +29,7 @@ export async function pick(onProgress=()=>{}){
 export async function stream(model,messages,onTok,signal){
  if(mode==="web"){
   signal&&signal.addEventListener("abort",()=>eng.interruptGenerate());
-  const chunks=await eng.chat.completions.create({messages,stream:true,temperature:0.4});
+  const chunks=await eng.chat.completions.create({messages,stream:true,temperature:0.4,max_tokens:1200});
   for await(const c of chunks){const t=c.choices[0]&&c.choices[0].delta&&c.choices[0].delta.content;if(t)onTok(t);}
   return;
  }

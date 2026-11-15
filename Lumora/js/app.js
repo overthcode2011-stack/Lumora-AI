@@ -74,7 +74,11 @@ function newChat(){show(null);$("in").focus();$("side").classList.remove("open")
 /* ---- generación ---- */
 async function generate(){
  busy=true;$("send").disabled=true;const c=cur,q=c.msgs[c.msgs.length-1].content;
- const msgs=[{role:"system",content:systemPrompt(recall(q))},...c.msgs.slice(-12).map(m=>({role:m.role,content:m.content}))];
+ // Historial recortado por tamaño: el modelo del navegador tiene una memoria de ~4000 tokens.
+ const hist=[];let size=0;
+ for(let i=c.msgs.length-1;i>=0;i--){const m=c.msgs[i];if(m.err)continue;if(size+m.content.length>6000&&hist.length)break;size+=m.content.length;hist.unshift({role:m.role,content:m.content});}
+ while(hist.length>1&&hist[0].role!=="user")hist.shift();
+ const msgs=[{role:"system",content:systemPrompt(recall(q))},...hist];
  const w=el("div","m bot",`<div class="ic">${ic("spark")}</div><div class="body"></div>`),body=w.querySelector(".body");
  renderBody("",body,true);$("msgs").appendChild(w);$("msgs").scrollTop=$("msgs").scrollHeight;
  let full="";ctrl=new AbortController();
@@ -84,7 +88,10 @@ async function generate(){
   c.msgs.push({role:"assistant",content:full});save();
   if(/\[\[FIN_CHAT\]\]/.test(full)&&!crisis(q))return del(c,BYE);
  }catch(e){
-  c.msgs.push({role:"assistant",content:"No pude generar la respuesta: "+e.message});save();
+  let msg=e.message||String(e);
+  if(/context|exceed|window/i.test(msg))msg="la conversación ya es demasiado larga para el modelo. Abre un chat nuevo con «Nuevo chat».";
+  else if(/lost|device|gpu|memory|out of/i.test(msg))msg="la gráfica dejó de responder (suele ser por memoria o calor). Recarga la página con Ctrl + F5: el modelo ya está descargado y carga rápido.";
+  c.msgs.push({role:"assistant",content:"No pude generar la respuesta: "+msg,err:true});save();
  }finally{busy=false;$("send").disabled=false;if(cur===c)show(c);}
 }
 async function submit(){

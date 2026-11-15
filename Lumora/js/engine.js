@@ -1,7 +1,10 @@
+
+const qs=new URLSearchParams(location.search).get("server");
+if(qs)try{localStorage.setItem("lumora_ollama",qs.replace(/\/$/,""));}catch{}
 const BASE=localStorage.getItem("lumora_ollama")||"http://localhost:11434";
 export async function pick(){
  const d=await (await fetch(BASE+"/api/tags")).json(),n=(d.models||[]).map(m=>m.name);
- return n.find(x=>/coder/.test(x))||n[0]||null;
+ return n.find(x=>/^lumora/.test(x))||n.find(x=>/coder/.test(x))||n[0]||null;
 }
 export async function stream(model,messages,onTok,signal){
  const r=await fetch(BASE+"/api/chat",{method:"POST",signal,body:JSON.stringify({model,messages,stream:true})});

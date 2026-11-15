@@ -1,5 +1,5 @@
 import {loadRules,systemPrompt,attachment,crisis,rules} from "./rules.js";
-import {loadMemory,learn,recall,exportLua} from "./memory.js";
+import {loadMemory,learn,recall,exportLua,hasPII} from "./memory.js";
 import {pick,stream} from "./engine.js";
 const $=id=>document.getElementById(id);
 const ic=(n,c="")=>`<svg class="i ${c}"><use href="#i-${n}"/></svg>`;
@@ -98,6 +98,19 @@ async function submit(){
  show(cur);await generate();
 }
 function retry(){if(busy||!cur)return;cur.msgs.pop();save();show(cur);generate();}
+
+/* ---- datos para entrenar: solo respuestas con «Me gusta» y sin datos personales ---- */
+function exportData(){
+ const sys=systemPrompt([]),out=[];
+ chats.forEach(c=>c.msgs.forEach((m,i)=>{
+  if(m.role!=="assistant"||m.rating!=="up"||!c.msgs[i-1])return;
+  const u=c.msgs[i-1].content,a=strip(m.content);if(hasPII(u)||hasPII(a))return;
+  out.push(JSON.stringify({messages:[{role:"system",content:sys},{role:"user",content:u},{role:"assistant",content:a}]}));
+ }));
+ if(!out.length){alert("Aún no hay respuestas con «Me gusta» para exportar.");return;}
+ const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([out.join("\n")],{type:"application/jsonl"}));a.download="lumora_dataset.jsonl";a.click();
+}
+$("ds").onclick=exportData;
 
 /* ---- arranque ---- */
 $("form").onsubmit=e=>{e.preventDefault();submit();};

@@ -1,6 +1,7 @@
 import {loadRules,systemPrompt,attachment,crisis,rules} from "./rules.js";
 import {loadMemory,learn,recall,exportLua,hasPII} from "./memory.js";
 import {pick,stream,getNivel,setNivel} from "./engine.js";
+import {loadKnowledge,relevant} from "./knowledge.js";
 const $=id=>document.getElementById(id);
 const ic=(n,c="")=>`<svg class="i ${c}"><use href="#i-${n}"/></svg>`;
 const K="lumora_chats",BYE="Este chat se eliminó: Lumora AI no crea vínculos afectivos. Puedes empezar uno nuevo para seguir con tus proyectos.";
@@ -71,6 +72,18 @@ function show(c,notice){
 function del(c,notice){chats=chats.filter(x=>x!==c);save();if(cur===c)show(null,notice);else drawList();}
 function newChat(){show(null);$("in").focus();$("side").classList.remove("open");}
 
+/* ---- aprende de tus «Me gusta»: usa una respuesta buena parecida como ejemplo ---- */
+const wd=t=>(t.toLowerCase().match(/[a-záéíóúñ0-9_]{4,}/g)||[]);
+function example(q){
+ const w=new Set(wd(q));let best=null,bs=2;
+ chats.forEach(c=>c.msgs.forEach((m,i)=>{
+  if(m.role!=="assistant"||m.rating!=="up"||!c.msgs[i-1])return;
+  const u=c.msgs[i-1].content,a=strip(m.content);if(a.length>900||hasPII(u)||hasPII(a))return;
+  const s=wd(u).filter(x=>w.has(x)).length;if(s>bs){bs=s;best={u,a};}
+ }));
+ return best?"\nEjemplo de respuesta que gustó (pregunta: "+best.u.slice(0,120)+"):\n"+best.a:"";
+}
+
 /* ---- generación ---- */
 async function generate(){
  busy=true;$("send").disabled=true;const c=cur,q=c.msgs[c.msgs.length-1].content;
@@ -78,7 +91,7 @@ async function generate(){
  const hist=[];let size=0;
  for(let i=c.msgs.length-1;i>=0;i--){const m=c.msgs[i];if(m.err)continue;if(size+m.content.length>6000&&hist.length)break;size+=m.content.length;hist.unshift({role:m.role,content:m.content});}
  while(hist.length>1&&hist[0].role!=="user")hist.shift();
- const msgs=[{role:"system",content:systemPrompt(recall(q))},...hist];
+ const msgs=[{role:"system",content:systemPrompt(recall(q),relevant(q)+example(q))},...hist];
  const w=el("div","m bot",`<div class="ic">${ic("spark")}</div><div class="body"></div>`),body=w.querySelector(".body");
  renderBody("",body,true);$("msgs").appendChild(w);$("msgs").scrollTop=$("msgs").scrollHeight;
  let full="";ctrl=new AbortController();
@@ -128,6 +141,6 @@ $("nivel").value=getNivel();$("nivel").onchange=e=>{setNivel(e.target.value);loc
 $("new").onclick=newChat;$("q").oninput=drawList;$("exp").onclick=exportLua;
 $("menu").onclick=()=>$("side").classList.toggle("open");$("dev").textContent=device();
 (async()=>{
- await Promise.all([loadRules(),loadMemory()]);show(null);
+ await Promise.all([loadRules(),loadMemory(),loadKnowledge()]);show(null);
  $("send").disabled=true;try{model=await pick(t=>$("st").textContent=t);$("st").textContent=model||"Sin modelos";$("dot").className=model?"ok":"";}catch(e){$("st").textContent="Sin motor";modelError=e.message;add_err();}$("send").disabled=false;
 })();

@@ -1,92 +1,66 @@
-// engine.js adaptado para la API de Anthropic
+// Motor de IA. Por defecto corre DENTRO del navegador con WebLLM (WebGPU): sin servidor, sin app, gratis.
+// Si abres el sitio con ?server=https://... usa Ollama en tu PC; con ?server=off vuelve al modo navegador.
+const WEBLLM="https://esm.run/@mlc-ai/web-llm@0.2.86";
+const qs=new URLSearchParams(location.search).get("server");
+if(qs)try{qs==="off"?localStorage.removeItem("lumora_ollama"):localStorage.setItem("lumora_ollama",qs.replace(/\/$/,""));}catch{}
+const OLLAMA=localStorage.getItem("lumora_ollama");
+// Niveles de modelo (memoria aproximada en GPU). Si uno no entra, baja al siguiente.
+const LEVELS={
+ ligero:["Qwen2.5-Coder-0.5B-Instruct"],
+ equilibrado:["Qwen2.5-Coder-1.5B-Instruct","Qwen2.5-Coder-0.5B-Instruct"],
+ potente:["Qwen2.5-Coder-7B-Instruct","Qwen2.5-Coder-1.5B-Instruct","Qwen2.5-Coder-0.5B-Instruct"],
+ maximo:["Qwen3.5-9B","Qwen2.5-Coder-1.5B-Instruct","Qwen2.5-Coder-0.5B-Instruct"]
+};
+export const getNivel=()=>{const n=localStorage.getItem("lumora_nivel");return LEVELS[n]?n:"equilibrado";};
+export const setNivel=n=>{try{localStorage.setItem("lumora_nivel",n);}catch{}};
+let eng=null,mode="web",create=null,loadedId=null;
 
-let currentLevel = localStorage.getItem("lumora_nivel") || "equilibrado";
-
-export function getNivel() {
-    return currentLevel;
+export async function pick(onProgress=()=>{}){
+ if(OLLAMA){mode="ollama";
+  const d=await (await fetch(OLLAMA+"/api/tags")).json(),n=(d.models||[]).map(m=>m.name);
+  return n.find(x=>/^lumora/.test(x))||n.find(x=>/coder/.test(x))||n[0]||null;}
+ if(!navigator.gpu)throw new Error("Tu navegador no tiene WebGPU. Usa Chrome, Edge u Opera actualizados.");
+ const ad=await navigator.gpu.requestAdapter();
+ if(!ad)throw new Error("No se encontró una GPU compatible con WebGPU.");
+ const q=ad.features.has("shader-f16")?"q4f16_1":"q4f32_1";
+ const {CreateMLCEngine}=await import(WEBLLM);
+ let last;
+ for(const base of LEVELS[getNivel()]){
+  const id=`${base}-${q}-MLC`,size=base.replace("-Instruct","");
+  try{
+   create=CreateMLCEngine;loadedId=id;eng=await CreateMLCEngine(id,{initProgressCallback:p=>onProgress(`Cargando ${size}… ${Math.round((p.progress||0)*100)}%`)});
+   return id;
+  }catch(e){last=e;}
+ }
+ throw new Error("No pude cargar el modelo en tu GPU: "+(last&&last.message||last));
 }
 
-export function setNivel(nivel) {
-    currentLevel = nivel;
-    localStorage.setItem("lumora_nivel", nivel);
-}
-
-export async function pick(onProgress) {
-    onProgress("Conectado a Anthropic API");
-    // Modelo recomendado de Claude (ej: claude-3-5-sonnet-20241022)
-    return "claude-3-5-sonnet-20241022"; 
-}
-
-export async function stream(model, messages, onChunk, signal, onStatus) {
-    onStatus("Pensando...");
-
-    const API_URL = "https://api.anthropic.com/v1/messages";
-    const API_KEY = "TU_API_KEY_DE_ANTHROPIC"; // Reemplaza con tu clave de Anthropic
-
-    // Anthropic separa el system prompt del array de mensajes por requerimientos de su API
-    let systemPrompt = "";
-    const formattedMessages = [];
-
-    for (const m of messages) {
-        if (m.role === "system") {
-            systemPrompt = m.content;
-        } else {
-            formattedMessages.push({
-                role: m.role,
-                content: m.content
-            });
-        }
-    }
-
-    const response = await fetch(API_URL, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "x-api-key": API_KEY,
-            "anthropic-version": "2023-06-01",
-            "anthropic-dangerous-direct-browser-access": "true" // Necesario si se llama directamente desde el navegador
-        },
-        body: JSON.stringify({
-            model: model,
-            max_tokens: 4096,
-            system: systemPrompt,
-            messages: formattedMessages,
-            stream: true
-        }),
-        signal: signal
-    });
-
-    if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Error en la API de Anthropic (${response.status}): ${errText}`);
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop();
-
-        for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith("data:")) continue;
-            const dataStr = trimmed.replace("data:", "").trim();
-
-            try {
-                const json = JSON.parse(dataStr);
-                // El streaming de Anthropic emite diferentes eventos (content_block_delta, etc.)
-                if (json.type === "content_block_delta" && json.delta?.text) {
-                    onChunk(json.delta.text);
-                }
-            } catch (e) {
-                // Ignorar errores de parsing en fragmentos
-            }
-        }
-    }
+export async function stream(model,messages,onTok,signal,onStatus=()=>{}){
+ if(mode==="web"){
+  signal&&signal.addEventListener("abort",()=>eng&&eng.interruptGenerate());
+  let got=false;
+  const run=async()=>{
+   const chunks=await eng.chat.completions.create({messages,stream:true,temperature:0.3,max_tokens:getNivel()==="maximo"?1800:1200});
+   for await(const c of chunks){const t=c.choices[0]&&c.choices[0].delta&&c.choices[0].delta.content;if(t){got=true;onTok(t);}}
+  };
+  try{await run();}
+  catch(e){
+   // El navegador a veces descarga el modelo de la GPU (inactividad, memoria). Se recarga solo y se reintenta.
+   if(got||!create||!/not loaded|device|lost|reload/i.test(String(e&&e.message)))throw e;
+   eng=await create(loadedId,{initProgressCallback:p=>onStatus(`Recargando modelo… ${Math.round((p.progress||0)*100)}%`)});
+   onStatus(loadedId);await run();
+  }
+  return;
+ }
+ const r=await fetch(OLLAMA+"/api/chat",{method:"POST",signal,body:JSON.stringify({model,messages,stream:true})});
+ if(!r.ok)throw new Error(await r.text());
+ const rd=r.body.getReader(),dec=new TextDecoder();let buf="",th=false;
+ for(;;){
+  const {done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});
+  const ls=buf.split("\n");buf=ls.pop();
+  for(const l of ls){if(!l.trim())continue;const j=JSON.parse(l);if(j.error)throw new Error(j.error);const m=j.message||{};
+   if(m.thinking){if(!th){onTok("<think>");th=true;}onTok(m.thinking);}
+   if(m.content){if(th){onTok("</think>");th=false;}onTok(m.content);}}
+ }
+ if(th)onTok("</think>");
 }

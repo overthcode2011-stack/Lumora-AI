@@ -2,6 +2,7 @@ import {loadRules,systemPrompt,attachment,crisis,rules} from "./rules.js";
 import {loadMemory,learn,recall,exportLua,hasPII} from "./memory.js";
 import {pick,stream,getNivel,setNivel} from "./engine.js";
 import {loadKnowledge,relevant} from "./knowledge.js";
+import {setDots} from "./dots.js";
 const $=id=>document.getElementById(id);
 const ic=(n,c="")=>`<svg class="i ${c}"><use href="#i-${n}"/></svg>`;
 const K="lumora_chats",BYE="Este chat se eliminó: Lumora AI no crea vínculos afectivos. Puedes empezar uno nuevo para seguir con tus proyectos.";
@@ -11,6 +12,7 @@ try{chats=JSON.parse(localStorage.getItem(K))||[];}catch{}
 const save=()=>{try{localStorage.setItem(K,JSON.stringify(chats));}catch{}};
 const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
 const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const drawer=v=>{$("side").classList.toggle("open",v);$("scrim").classList.toggle("on",v);};
 const TAGS=/\[\[(APRENDER|FIN_CHAT)[^\]]*\]?\]?/g;
 const strip=t=>t.replace(/<think>[\s\S]*?(<\/think>|$)/g,"").replace(TAGS,"").trim();
 
@@ -60,7 +62,7 @@ function drawList(){
  if(!f.length)l.appendChild(el("div","empty",q?"Sin resultados.":"Aún no hay chats."));
  f.forEach(c=>{const r=el("div","ci"+(c===cur?" on":""),"<span></span>");r.firstChild.textContent=c.title;
   const d=el("button","",ic("trash"));d.title="Eliminar chat";d.setAttribute("aria-label","Eliminar chat");d.onclick=e=>{e.stopPropagation();del(c);};
-  r.appendChild(d);r.onclick=()=>{show(c);$("side").classList.remove("open");};l.appendChild(r);});
+  r.appendChild(d);r.onclick=()=>{show(c);drawer(false);};l.appendChild(r);});
 }
 function show(c,notice){
  cur=c;$("msgs").innerHTML="";$("title").textContent=c?c.title:"Nuevo chat";
@@ -70,7 +72,7 @@ function show(c,notice){
  drawList();
 }
 function del(c,notice){chats=chats.filter(x=>x!==c);save();if(cur===c)show(null,notice);else drawList();}
-function newChat(){show(null);$("in").focus();$("side").classList.remove("open");}
+function newChat(){show(null);$("in").focus();drawer(false);}
 
 /* ---- aprende de tus «Me gusta»: usa una respuesta buena parecida como ejemplo ---- */
 const wd=t=>(t.toLowerCase().match(/[a-záéíóúñ0-9_]{4,}/g)||[]);
@@ -86,12 +88,12 @@ function example(q){
 
 /* ---- generación ---- */
 async function generate(){
- busy=true;$("send").disabled=true;const c=cur,q=c.msgs[c.msgs.length-1].content;
+ busy=true;setDots(false);$("send").disabled=true;const c=cur,q=c.msgs[c.msgs.length-1].content;
  // Historial recortado por tamaño: el modelo del navegador tiene una memoria de ~4000 tokens.
  const hist=[];let size=0;
  for(let i=c.msgs.length-1;i>=0;i--){const m=c.msgs[i];if(m.err)continue;if(size+m.content.length>6000&&hist.length)break;size+=m.content.length;hist.unshift({role:m.role,content:m.content});}
  while(hist.length>1&&hist[0].role!=="user")hist.shift();
- const msgs=[{role:"system",content:systemPrompt(recall(q),relevant(q)+example(q))},...hist];
+ const msgs=[{role:"system",content:systemPrompt(recall(q),relevant(q)+example(q),model)},...hist];
  const w=el("div","m bot",`<div class="ic">${ic("spark")}</div><div class="body"></div>`),body=w.querySelector(".body");
  renderBody("",body,true);$("msgs").appendChild(w);$("msgs").scrollTop=$("msgs").scrollHeight;
  let full="";ctrl=new AbortController();
@@ -105,7 +107,7 @@ async function generate(){
   if(/context|exceed|window/i.test(msg))msg="la conversación ya es demasiado larga para el modelo. Abre un chat nuevo con «Nuevo chat».";
   else if(/lost|device|gpu|memory|out of/i.test(msg))msg="la gráfica dejó de responder (suele ser por memoria o calor). Recarga la página con Ctrl + F5: el modelo ya está descargado y carga rápido.";
   c.msgs.push({role:"assistant",content:"No pude generar la respuesta: "+msg,err:true});save();
- }finally{busy=false;$("send").disabled=false;if(cur===c)show(c);}
+ }finally{busy=false;setDots(true);$("send").disabled=false;if(cur===c)show(c);}
 }
 async function submit(){
  const text=$("in").value.trim();if(!text||busy)return;
@@ -139,8 +141,8 @@ $("in").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();submit
 $("in").oninput=e=>{e.target.style.height="48px";e.target.style.height=Math.min(e.target.scrollHeight,160)+"px";};
 $("nivel").value=getNivel();$("nivel").onchange=e=>{setNivel(e.target.value);location.reload();};
 $("new").onclick=newChat;$("q").oninput=drawList;$("exp").onclick=exportLua;
-$("menu").onclick=()=>$("side").classList.toggle("open");$("dev").textContent=device();
+$("menu").onclick=()=>drawer(!$("side").classList.contains("open"));$("scrim").onclick=()=>drawer(false);$("dev").textContent=device();
 (async()=>{
  await Promise.all([loadRules(),loadMemory(),loadKnowledge()]);show(null);
- $("send").disabled=true;try{model=await pick(t=>$("st").textContent=t);$("st").textContent=model||"Sin modelos";$("dot").className=model?"ok":"";}catch(e){$("st").textContent="Sin motor";modelError=e.message;add_err();}$("send").disabled=false;
+ setDots(false);$("send").disabled=true;try{model=await pick(t=>$("st").textContent=t);$("st").textContent=model||"Sin modelos";$("dot").className=model?"ok":"";}catch(e){$("st").textContent="Sin motor";modelError=e.message;add_err();}$("send").disabled=false;setDots(true);
 })();

@@ -4,16 +4,14 @@ const WEBLLM="https://esm.run/@mlc-ai/web-llm@0.2.86";
 const qs=new URLSearchParams(location.search).get("server");
 if(qs)try{qs==="off"?localStorage.removeItem("lumora_ollama"):localStorage.setItem("lumora_ollama",qs.replace(/\/$/,""));}catch{}
 const OLLAMA=localStorage.getItem("lumora_ollama");
-// Niveles de modelo (memoria aproximada en GPU). Si uno no entra, baja al siguiente.
-const LEVELS={
- ligero:["Qwen2.5-Coder-0.5B-Instruct"],
- equilibrado:["Qwen2.5-Coder-1.5B-Instruct","Qwen2.5-Coder-0.5B-Instruct"],
- potente:["Qwen2.5-Coder-7B-Instruct","Qwen2.5-Coder-1.5B-Instruct","Qwen2.5-Coder-0.5B-Instruct"],
- maximo:["Qwen3.5-9B","Qwen2.5-Coder-1.5B-Instruct","Qwen2.5-Coder-0.5B-Instruct"]
-};
-export const getNivel=()=>{const n=localStorage.getItem("lumora_nivel");return LEVELS[n]?n:"equilibrado";};
+// Modelos pro-coder (memoria aproximada en GPU). Si uno no entra, baja al siguiente y avisa.
+const B05="Qwen2.5-Coder-0.5B-Instruct",B15="Qwen2.5-Coder-1.5B-Instruct",B7="Qwen2.5-Coder-7B-Instruct",B9="Qwen3.5-9B";
+const NAME={[B05]:"pro-coder1",[B15]:"pro-coder2",[B7]:"pro-coder3",[B9]:"pro-coder4"};
+const MODELS={"pro-coder1":[B05],"pro-coder2":[B15,B05],"pro-coder3":[B7,B15,B05],"pro-coder4":[B9,B15,B05]};
+const OLD={ligero:"pro-coder1",equilibrado:"pro-coder2",potente:"pro-coder3",maximo:"pro-coder4"};
+export const getNivel=()=>{const n=localStorage.getItem("lumora_nivel");return MODELS[n]?n:OLD[n]||"pro-coder2";};
 export const setNivel=n=>{try{localStorage.setItem("lumora_nivel",n);}catch{}};
-let eng=null,mode="web",create=null,loadedId=null;
+let eng=null,mode="web",create=null,loadedId=null,loadedName=null;
 
 export async function pick(onProgress=()=>{}){
  if(OLLAMA){mode="ollama";
@@ -25,11 +23,11 @@ export async function pick(onProgress=()=>{}){
  const q=ad.features.has("shader-f16")?"q4f16_1":"q4f32_1";
  const {CreateMLCEngine}=await import(WEBLLM);
  let last;
- for(const base of LEVELS[getNivel()]){
-  const id=`${base}-${q}-MLC`,size=base.replace("-Instruct","");
+ for(const base of MODELS[getNivel()]){
+  const id=`${base}-${q}-MLC`,size=NAME[base];
   try{
-   create=CreateMLCEngine;loadedId=id;eng=await CreateMLCEngine(id,{initProgressCallback:p=>onProgress(`Cargando ${size}… ${Math.round((p.progress||0)*100)}%`)});
-   return id;
+   create=CreateMLCEngine;loadedId=id;loadedName=NAME[base];eng=await CreateMLCEngine(id,{initProgressCallback:p=>onProgress(`Cargando ${size}… ${Math.round((p.progress||0)*100)}%`)});
+   return NAME[base];
   }catch(e){last=e;}
  }
  throw new Error("No pude cargar el modelo en tu GPU: "+(last&&last.message||last));
@@ -40,7 +38,7 @@ export async function stream(model,messages,onTok,signal,onStatus=()=>{}){
   signal&&signal.addEventListener("abort",()=>eng&&eng.interruptGenerate());
   let got=false;
   const run=async()=>{
-   const chunks=await eng.chat.completions.create({messages,stream:true,temperature:0.3,max_tokens:getNivel()==="maximo"?1800:1200});
+   const chunks=await eng.chat.completions.create({messages,stream:true,temperature:0.3,top_p:0.9,max_tokens:getNivel()==="pro-coder4"?1800:1200});
    for await(const c of chunks){const t=c.choices[0]&&c.choices[0].delta&&c.choices[0].delta.content;if(t){got=true;onTok(t);}}
   };
   try{await run();}
@@ -48,7 +46,7 @@ export async function stream(model,messages,onTok,signal,onStatus=()=>{}){
    // El navegador a veces descarga el modelo de la GPU (inactividad, memoria). Se recarga solo y se reintenta.
    if(got||!create||!/not loaded|device|lost|reload/i.test(String(e&&e.message)))throw e;
    eng=await create(loadedId,{initProgressCallback:p=>onStatus(`Recargando modelo… ${Math.round((p.progress||0)*100)}%`)});
-   onStatus(loadedId);await run();
+   onStatus(loadedName);await run();
   }
   return;
  }

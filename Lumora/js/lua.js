@@ -1,4 +1,4 @@
-
+// Lector/escritor de tablas Lua de solo datos. No ejecuta código.
 export function parseLua(src){
  let p=0;
  const ws=()=>{for(;;){while(/\s/.test(src[p]||""))p++;if(src.startsWith("--",p)){while(p<src.length&&src[p]!=="\n")p++;}else return;}};

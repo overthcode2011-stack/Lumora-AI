@@ -1,5 +1,4 @@
-// Motor de IA. Por defecto corre DENTRO del navegador con WebLLM (WebGPU): sin servidor, sin app, gratis.
-// Si abres el sitio con ?server=https://... usa Ollama en tu PC; con ?server=off vuelve al modo navegador.
+
 const WEBLLM="https://esm.run/@mlc-ai/web-llm@0.2.86";
 const qs=new URLSearchParams(location.search).get("server");
 if(qs)try{qs==="off"?localStorage.removeItem("lumora_ollama"):localStorage.setItem("lumora_ollama",qs.replace(/\/$/,""));}catch{}
@@ -16,7 +15,7 @@ let eng=null,mode="web",create=null,loadedId=null,loadedName=null;
 export async function pick(onProgress=()=>{}){
  if(OLLAMA){mode="ollama";
   const d=await (await fetch(OLLAMA+"/api/tags")).json(),n=(d.models||[]).map(m=>m.name);
-  return n.find(x=>/^lumora/.test(x))||n.find(x=>/coder/.test(x))||n[0]||null;}
+  return n.find(x=>/^(pro-coder|lumora)/.test(x))||n.find(x=>/coder/.test(x))||n[0]||null;}
  if(!navigator.gpu)throw new Error("Tu navegador no tiene WebGPU. Usa Chrome, Edge u Opera actualizados.");
  const ad=await navigator.gpu.requestAdapter();
  if(!ad)throw new Error("No se encontró una GPU compatible con WebGPU.");

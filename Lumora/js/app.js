@@ -64,10 +64,17 @@ function drawList(){
   const d=el("button","",ic("trash"));d.title="Eliminar chat";d.setAttribute("aria-label","Eliminar chat");d.onclick=e=>{e.stopPropagation();del(c);};
   r.appendChild(d);r.onclick=()=>{show(c);drawer(false);};l.appendChild(r);});
 }
+function greeting(){
+ const h=new Date().getHours();
+ let g="Buenas noches";
+ if(h>=5&&h<12)g="Buenos días";
+ else if(h>=12&&h<20)g="Buenas tardes";
+ return g;
+}
 function show(c,notice){
  cur=c;$("msgs").innerHTML="";$("title").textContent=c?c.title:"Nuevo chat";
  if(notice)$("msgs").appendChild(el("div","notice",notice));
- if(!c||!c.msgs.length)$("msgs").appendChild(el("div","hero",`${ic("spark")}<h2>Lumora AI</h2><div>Pregúntame sobre scripts, sitios web y Lua. Si te entrego un archivo, lo verás listo para descargar.</div>`));
+ if(!c||!c.msgs.length)$("msgs").appendChild(el("div","hero",`${ic("spark")}<h2>${greeting()}</h2><div>Soy Lumora. Pregúntame sobre HTML, CSS, JavaScript, Lua, Roblox o cualquier script. Si te entrego un archivo, lo verás listo para descargar.</div>`));
  else c.msgs.forEach((m,i)=>addMsg(m,i===c.msgs.length-1));
  drawList();
 }

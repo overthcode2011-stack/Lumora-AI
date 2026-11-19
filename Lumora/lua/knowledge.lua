@@ -560,5 +560,106 @@ window.addEventListener("popstate", () => render(location.pathname));'
 - Debounce en scroll/resize/input pesados.
 - Evita innerHTML en bucles grandes; usa DocumentFragment o templates.
 - Mide con Lighthouse y las DevTools (Performance, Network, Coverage).'
+  },
+  {
+    id = "web-pro-principios",
+    tags = "profesional|pro|claude|premium|calidad|elegante|pulido|refinado|saas|startup|landing|producto|marca|brand",
+    text = 'SITIOS WEB PROFESIONALES (calidad Claude / productos reales):
+NUNCA hagas plantillas genericas con Inter + azul #3b82f6 + hero generico.
+Principios:
+1. Concepto claro: elige una idea visual fuerte (oscuro sofisticado, editorial, brutalista suave, glass + luz, monoacentico).
+2. Tipografia: 2 fuentes max. Display con caracter (Outfit, Syne, Instrument Serif, Fraunces, Geist) + texto legible. Escala tipografica clara (clamp).
+3. Espaciado generoso y consistente (sistema 4/8px). Mucho aire. No apretar.
+4. Jerarquia: un solo foco por seccion. Titulos cortos y potentes.
+5. Microinteracciones: hover sutiles, transiciones 150-250ms, focus visibles.
+6. Color: paleta de 4-6 tonos en :root. Un acento fuerte, no muchos colores.
+7. Contenido realista: textos creibles, no Lorem. CTAs concretos.
+8. Detalles de calidad: bordes sutiles, sombras en capas, degradados controlados, estados vacios y loading.'
+  },
+  {
+    id = "web-pro-layout",
+    tags = "layout|estructura|seccion|secciones|hero|navbar|footer|grid|columnas|contenedor|max-width|padding",
+    text = 'LAYOUT PROFESIONAL:
+- Contenedor: max-width 1120-1280px; margin: 0 auto; padding lateral clamp(1.25rem, 4vw, 2rem).
+- Hero: min-height 70-90vh, titulo grande (clamp 2.5rem-4.5rem), subtitulo 1.1-1.25rem muted, CTA principal + secundario.
+- Secciones: padding vertical generoso (clamp(4rem, 10vw, 7rem)). Alterna fondos sutiles.
+- Grid de features: repeat(auto-fit, minmax(260px, 1fr)); gap 1.25-1.75rem.
+- Navbar: sticky, blur, altura 64-72px, logo izquierda, links centro o derecha, CTA a la derecha.
+- Footer: columnas (producto, recursos, legal) + linea inferior con copyright.
+- Mobile: una columna, CTA a ancho completo, menu hamburguesa limpio.'
+  },
+  {
+    id = "web-pro-ui",
+    tags = "boton|botones|card|tarjeta|input|formulario|badge|tag|sombra|borde|radio|radius|componente|ui|kit",
+    text = 'COMPONENTES UI PRO:
+Botones:
+- Primario: fondo acento, texto contraste, border-radius 10-12px, padding 12px 20px, font-weight 500.
+- Secundario: borde sutil + fondo transparente o panel.
+- Hover: translateY(-1px) o brillo sutil; active: scale(0.98).
+Cards:
+- Fondo panel, borde 1px sutil, radius 14-16px, padding 1.25-1.5rem.
+- Hover opcional: borde mas claro + sombra suave.
+Inputs:
+- Altura 44-48px, border sutil, focus ring con acento a baja opacidad.
+- Labels siempre visibles (no solo placeholder).
+Badges: pill pequeno, texto 12px, fondo acento al 15%.
+Sombras: bordes + sombras muy suaves en capas. Evitar sombras negras duras.
+Radius consistente (10 / 12 / 16).'
+  },
+  {
+    id = "web-pro-estilo",
+    tags = "oscuro|dark|light|tema|paleta|color|tipografia|fuente|font|degradado|gradient|glass|minimal|editorial",
+    text = 'ESTILOS PREMIUM:
+Dark tech: --bg:#09090b; --panel:#111113; --text:#fafafa; --muted:#a1a1aa; --border:#27272a; acento vivo pero no neon.
+Light editorial: fondos off-white, texto casi negro, serif en titulos.
+Glass: rgba + backdrop-filter blur(12px); borde rgba blanco bajo.
+Tipografia: titulos con letter-spacing negativo (-0.02 a -0.04em), line-height 1.1-1.2; cuerpo 1.55-1.7 y max-width 65ch.
+Nunca: Arial + azul bootstrap + 3 columnas identicas con iconos genericos.'
+  },
+  {
+    id = "web-pro-motion",
+    tags = "animacion|motion|hover|transicion|reveal|scroll|microinteraccion|keyframes|entrada",
+    text = 'MOTION PROFESIONAL:
+- Transiciones 150-250ms ease o cubic-bezier(.4,0,.2,1).
+- Entrada: fade + translateY(8-16px), sin rebotes exagerados.
+- Scroll reveal con IntersectionObserver y clase .in.
+- Stagger 40-80ms entre items.
+- Hover de cards: elevacion sutil o borde, no scale grande.
+- Respetar prefers-reduced-motion.
+- Preferir transform y opacity (no animar width/height).
+- :focus-visible siempre visible.'
+  },
+  {
+    id = "web-pro-codigo",
+    tags = "html|css|estructura|semantico|accesible|limpio|mantenible|variables|organizacion|archivo",
+    text = 'CODIGO WEB DE CALIDAD:
+HTML semantico (header, main, section, nav, footer). Un h1. alt utiles. labels reales.
+CSS: tokens en :root, mobile-first, clases legibles (.btn, .card), sin !important.
+JS: modules, estados loading/error/vacio.
+Entrega archivos completos listos para usar, diseno original, no esqueleto vacio.'
+  },
+  {
+    id = "web-pro-anti",
+    tags = "evitar|malo|generico|plantilla|template|bootstrap|basico|amateur|feo",
+    text = 'EVITAR (amateur):
+- Hero generico Welcome / Learn More.
+- 3 features identicas con iconos genericos.
+- Inter/Roboto/Arial sin personalidad.
+- Solo azul #3b82f6 sin sistema de color.
+- Sombras negras fuertes y radius inconsistente.
+- Formularios sin labels.
+- Lorem ipsum en entregas finales.
+Aunque pida algo simple: buen espaciado, tipografia y jerarquia.'
+  },
+  {
+    id = "github-uso",
+    tags = "github|repo|repositorio|raw|archivo|codigo|ajeno|leer|analizar|revisar|pr|pull",
+    text = 'GITHUB:
+Si el usuario pasa un enlace de GitHub:
+- Archivo: preferir URL raw.githubusercontent.com/user/repo/branch/ruta.
+- Analiza, explica, mejora o reescribe.
+- No redistribuyas proyectos con licencia restrictiva enteros.
+- Si no tienes el contenido, pide URL raw o el codigo pegado.
+Prioriza diseno original; no clones pixel-perfect de productos ajenos.'
   }
 }

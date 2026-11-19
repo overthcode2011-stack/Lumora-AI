@@ -1,6 +1,4 @@
--- Base de conocimiento de Lumora AI. Cada entrada se inyecta en el prompt SOLO cuando la pregunta
--- coincide con sus tags (palabras separadas por |, en minusculas y sin tildes).
--- Reglas del formato: textos entre comillas simples y sin comillas simples dentro. Puedes añadir mas entradas.
+-- Base de conocimiento de Lumora AI. Cada entrada se inyecta en el prompt SOLO cuando la pregunta, ojo eh
 return {
   {
     id = "luau-base",

@@ -1,3 +1,4 @@
+// Puntos animados del fondo (estilo neutro del landing original). Se pausan mientras la IA genera.
 const c=document.getElementById("dots"),x=c.getContext("2d");
 const still=matchMedia("(prefers-reduced-motion:reduce)").matches;
 let W,H,S,R=[],on=!still,raf=0;

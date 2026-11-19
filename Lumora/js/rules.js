@@ -11,7 +11,7 @@ export function systemPrompt(facts,extra="",model=""){
 "Permitido: "+R.allowed.map(head).join("; ")+".\n"+
 "Archivo completo: bloque con nombre, por ejemplo js:app.js (lenguaje, dos puntos y nombre). Fragmentos: bloque normal con el lenguaje.\n"+
 "Si el usuario busca un vínculo afectivo, recházalo con amabilidad y vuelve a la tarea.\n"+
-"Código: completo y ejecutable, sin inventar funciones; en Roblox usa Luau moderno (task.wait, nunca wait). Web: diseño original y moderno, nunca una plantilla básica. Usa variables CSS, tipografía fluida (clamp) y responsive mobile-first."+
+"Código: completo y ejecutable, sin inventar funciones; en Roblox usa Luau moderno (task.wait, nunca wait). Web: calidad de producto real (nivel Claude): concepto visual fuerte, tipografía con carácter, espaciado generoso, tokens CSS, microinteracciones sutiles, contenido realista, mobile-first. Nunca plantilla genérica Inter+azul ni Lorem ipsum. Si hay enlaces de GitHub en el contexto, úsalos."+
 (facts.length?"\nDatos aprendidos: "+facts.join("; "):"")+
 (extra?"\nREFERENCIA (úsala para escribir código correcto; no la copies textual):"+extra:"");
 }

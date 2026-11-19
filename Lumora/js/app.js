@@ -93,14 +93,39 @@ function example(q){
  return best?"\nEjemplo de respuesta que gustó (pregunta: "+best.u.slice(0,120)+"):\n"+best.a:"";
 }
 
+
+/* ---- GitHub: leer archivos publicos (raw / api) ---- */
+async function fetchGitHubContext(text){
+  const urls = text.match(/https?:\/\/(?:raw\.)?github(?:usercontent)?\.com\/[^\s)>"']+/gi) || [];
+  if(!urls.length) return "";
+  let out = "";
+  for(const u0 of urls.slice(0,3)){
+    let u = u0.replace(/[.,;]+$/,"");
+    // blob/tree -> raw
+    u = u.replace("github.com/","raw.githubusercontent.com/").replace(/\/blob\//,"/").replace(/\/tree\//,"/");
+    try{
+      $("st").textContent = "Leyendo GitHub…";
+      const r = await fetch(u, {signal: AbortSignal.timeout(12000)});
+      if(!r.ok) throw new Error(r.status);
+      let body = await r.text();
+      if(body.length > 12000) body = body.slice(0,12000) + "\n…[recortado]";
+      out += "\n[GitHub "+u+"]\n"+body+"\n";
+    }catch(e){
+      out += "\n[GitHub "+u+": no se pudo leer ("+(e.message||e)+")]\n";
+    }
+  }
+  return out;
+}
+
 /* ---- generación ---- */
 async function generate(){
  busy=true;setDots(false);$("send").disabled=true;const c=cur,q=c.msgs[c.msgs.length-1].content;
+ const gh = await fetchGitHubContext(q);
  // Historial recortado por tamaño: el modelo del navegador tiene una memoria de ~4000 tokens.
  const hist=[];let size=0;
  for(let i=c.msgs.length-1;i>=0;i--){const m=c.msgs[i];if(m.err)continue;if(size+m.content.length>6000&&hist.length)break;size+=m.content.length;hist.unshift({role:m.role,content:m.content});}
  while(hist.length>1&&hist[0].role!=="user")hist.shift();
- const msgs=[{role:"system",content:systemPrompt(recall(q),relevant(q)+example(q),model)},...hist];
+ const msgs=[{role:"system",content:systemPrompt(recall(q),relevant(q)+example(q)+gh,model)},...hist];
  const w=el("div","m bot",`<div class="ic">${ic("spark")}</div><div class="body"></div>`),body=w.querySelector(".body");
  renderBody("",body,true);$("msgs").appendChild(w);$("msgs").scrollTop=$("msgs").scrollHeight;
  let full="";ctrl=new AbortController();

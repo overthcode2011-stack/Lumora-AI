@@ -8,7 +8,7 @@ Usa WebGPU y funciona sin necesidad de conexión a Internet, se divide en 4 mode
 
 Yo Replicated man autorizo el uso de mi software IA para ser usado como usuario y para que sea modificado para mayor rendimiento o mejoras, prohíbo la redistribución o copias de mi inteligencia artificial.
 
-Si el código fuente es robado y vendido, se enfrentarán serias consecuencias legales con Replication Developement.
+Si el código fuente es robado y vendido, se enfrentarán serias consecuencias legales con Replication Development.
 
 Sinceramente -Replicated man y Replication Developement team.
 

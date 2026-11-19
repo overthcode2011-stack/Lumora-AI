@@ -1,5 +1,5 @@
 import {loadRules,systemPrompt,attachment,crisis,rules} from "./rules.js";
-import {loadMemory,learn,recall,exportLua,hasPII} from "./memory.js";
+import {loadMemory,learn,recall,exportLua,hasPII,forget} from "./memory.js";
 import {pick,stream,getNivel,setNivel} from "./engine.js";
 import {loadKnowledge,relevant} from "./knowledge.js";
 import {setDots} from "./dots.js";
@@ -25,7 +25,8 @@ function device(){const u=navigator.userAgent;
 function renderBody(raw,body,live){
  let t=raw.replace(TAGS,"");body.innerHTML="";
  const tm=t.match(/<think>([\s\S]*?)(<\/think>|$)/);
- if(tm){const open=live&&!tm[2],d=el("details","think",`<summary>${ic("spark",open?"spin":"")}<span>${open?"Pensando…":"Razonamiento"}</span>${ic("chev","chev")}</summary>`);
+ if(tm&&tm[2]&&!tm[1].trim())t=t.replace(tm[0],"");
+ else if(tm){const open=live&&!tm[2],d=el("details","think",`<summary>${ic("spark",open?"spin":"")}<span>${open?"Pensando…":"Razonamiento"}</span>${ic("chev","chev")}</summary>`);
   d.open=open;const p=el("div");p.textContent=tm[1].trim();d.appendChild(p);body.appendChild(d);t=t.replace(tm[0],"");}
  else if(live&&!t.trim())body.appendChild(el("div","think",`<summary style="display:flex;gap:8px;align-items:center">${ic("spark","spin")}<span>Pensando…</span></summary>`));
  t.split("```").forEach((part,i)=>{
@@ -94,44 +95,55 @@ function example(q){
 }
 
 
-/* ---- GitHub: leer archivos publicos (raw / api) ---- */
+/* ---- GitHub: leer archivos públicos (raw), recortado para no desbordar al modelo ---- */
 async function fetchGitHubContext(text){
-  const urls = text.match(/https?:\/\/(?:raw\.)?github(?:usercontent)?\.com\/[^\s)>"']+/gi) || [];
-  if(!urls.length) return "";
-  let out = "";
-  for(const u0 of urls.slice(0,3)){
-    let u = u0.replace(/[.,;]+$/,"");
-    // blob/tree -> raw
-    u = u.replace("github.com/","raw.githubusercontent.com/").replace(/\/blob\//,"/").replace(/\/tree\//,"/");
-    try{
-      $("st").textContent = "Leyendo GitHub…";
-      const r = await fetch(u, {signal: AbortSignal.timeout(12000)});
-      if(!r.ok) throw new Error(r.status);
-      let body = await r.text();
-      if(body.length > 12000) body = body.slice(0,12000) + "\n…[recortado]";
-      out += "\n[GitHub "+u+"]\n"+body+"\n";
-    }catch(e){
-      out += "\n[GitHub "+u+": no se pudo leer ("+(e.message||e)+")]\n";
-    }
-  }
-  return out;
+ const urls=text.match(/https?:\/\/(?:raw\.)?github(?:usercontent)?\.com\/[^\s)>"']+/gi)||[];
+ if(!urls.length)return "";
+ let out="";
+ for(const u0 of urls.slice(0,2)){
+  if(out.length>=3000)break;
+  const u=u0.replace(/[.,;]+$/,"").replace("github.com/","raw.githubusercontent.com/").replace(/\/blob\//,"/").replace(/\/tree\//,"/");
+  try{
+   $("st").textContent="Leyendo GitHub…";
+   const r=await fetch(u,{signal:AbortSignal.timeout(12000)});
+   if(!r.ok)throw new Error(r.status);
+   let body=await r.text();if(body.length>2500)body=body.slice(0,2500)+"\n…[recortado]";
+   out+="\n[GitHub "+u+"]\n"+body+"\n";
+  }catch(e){out+="\n[GitHub "+u+": no se pudo leer ("+(e.message||e)+")]\n";}
+ }
+ return out;
+}
+
+/* ---- cuánto contexto necesita cada pregunta: menos texto = más rápido y sin «arrastre» de temas viejos ---- */
+const CODE=/\b(crea|crear|haz|hazme|escribe|genera|programa|script|codigo|código|funci[oó]n|ejemplo|arregla|corrige|error|bug|html|css|js|javascript|lua|luau|roblox|python|pagina|página|web|sitio)\b/i;
+const DEF=/^[¿\s]*(qu[eé] es|qu[eé] son|qui[eé]n(es)? (es|son|fue)|cu[aá]l es|define|significa|por qu[eé]|cu[aá]nt[oa]s?)/i;
+const GREET=/^[¡¿\s]*(hola|buenas|buen[oa]s|hey|gracias|ok|vale|adi[oó]s)\b/i;
+const FOLLOW=/\b(eso|esto|esa|ese|esos|esas|anterior|arriba|contin[uú]a|sigue|mej[oó]ralo|corr[ií]gelo|c[aá]mbialo|otra vez|de nuevo|pero|adem[aá]s|y si|el c[oó]digo|ese c[oó]digo|el script|m[aá]s corto|m[aá]s largo)\b/i;
+export function plan(q){
+ const def=DEF.test(q);
+ return {code:CODE.test(q)&&!def,standalone:def||GREET.test(q)||(!FOLLOW.test(q)&&q.length>=30)};
 }
 
 /* ---- generación ---- */
 async function generate(){
  busy=true;setDots(false);$("send").disabled=true;const c=cur,q=c.msgs[c.msgs.length-1].content;
- const gh = await fetchGitHubContext(q);
- // Historial recortado por tamaño: el modelo del navegador tiene una memoria de ~4000 tokens.
+ const {code,standalone}=plan(q);
+ const gh=await fetchGitHubContext(q);
+ // Preguntas sueltas: solo el mensaje actual. Seguimientos ("mejóralo", "eso"): hasta 6 mensajes y ~3500 caracteres.
  const hist=[];let size=0;
- for(let i=c.msgs.length-1;i>=0;i--){const m=c.msgs[i];if(m.err)continue;if(size+m.content.length>6000&&hist.length)break;size+=m.content.length;hist.unshift({role:m.role,content:m.content});}
+ for(let i=c.msgs.length-1;i>=0;i--){const m=c.msgs[i];if(m.err)continue;
+  if(hist.length&&(standalone||hist.length>=6||size+m.content.length>3500))break;
+  const txt=m.role==="assistant"?strip(m.content):m.content;size+=txt.length;hist.unshift({role:m.role,content:txt});}
  while(hist.length>1&&hist[0].role!=="user")hist.shift();
- const msgs=[{role:"system",content:systemPrompt(recall(q),relevant(q)+example(q)+gh,model)},...hist];
+ const extra=(code?relevant(q)+example(q):"")+gh;
+ const msgs=[{role:"system",content:systemPrompt(recall(q),extra,model)},...hist];
  const w=el("div","m bot",`<div class="ic">${ic("spark")}</div><div class="body"></div>`),body=w.querySelector(".body");
  renderBody("",body,true);$("msgs").appendChild(w);$("msgs").scrollTop=$("msgs").scrollHeight;
- let full="";ctrl=new AbortController();
+ let full="",last=0,pend=false;ctrl=new AbortController();
+ // Pintar como máximo ~11 veces por segundo: redibujar en cada token frena mucho el móvil.
+ const paint=()=>{pend=false;last=performance.now();renderBody(full,body,true);$("msgs").scrollTop=$("msgs").scrollHeight;};
  try{
-  await stream(model,msgs,t=>{full+=t;renderBody(full,body,true);$("msgs").scrollTop=$("msgs").scrollHeight;},ctrl.signal,x=>{$("st").textContent=x;});
-  for(const t of full.matchAll(/\[\[APRENDER:\s*([\s\S]*?)\]\]/g))learn(t[1]);
+  await stream(model,msgs,t=>{full+=t;if(!pend){pend=true;setTimeout(paint,Math.max(0,90-(performance.now()-last)));}},ctrl.signal,x=>{$("st").textContent=x;},{long:code});
   c.msgs.push({role:"assistant",content:full});save();
   if(/\[\[FIN_CHAT\]\]/.test(full)&&!crisis(q))return del(c,BYE);
  }catch(e){
@@ -139,7 +151,7 @@ async function generate(){
   if(/context|exceed|window/i.test(msg))msg="la conversación ya es demasiado larga para el modelo. Abre un chat nuevo con «Nuevo chat».";
   else if(/lost|device|gpu|memory|out of/i.test(msg))msg="la gráfica dejó de responder (suele ser por memoria o calor). Recarga la página con Ctrl + F5: el modelo ya está descargado y carga rápido.";
   c.msgs.push({role:"assistant",content:"No pude generar la respuesta: "+msg,err:true});save();
- }finally{busy=false;setDots(true);$("send").disabled=false;if(cur===c)show(c);}
+ }finally{busy=false;setDots(true);$("send").disabled=false;$("st").textContent=model||"Sin modelo";if(cur===c)show(c);}
 }
 async function submit(){
  const text=$("in").value.trim();if(!text||busy)return;
@@ -166,6 +178,7 @@ function exportData(){
  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([out.join("\n")],{type:"application/jsonl"}));a.download="lumora_dataset.jsonl";a.click();
 }
 $("ds").onclick=exportData;
+$("fg").onclick=()=>{if(confirm("¿Borrar todo lo que Lumora aprendió de ti?")){forget();alert("Listo: Lumora olvidó lo aprendido.");}};
 
 /* ---- arranque ---- */
 $("form").onsubmit=e=>{e.preventDefault();submit();};

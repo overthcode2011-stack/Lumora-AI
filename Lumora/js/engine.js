@@ -1,10 +1,11 @@
-
+// Motor de IA. Por defecto corre DENTRO del navegador con WebLLM (WebGPU): sin servidor, sin app, gratis.
+// Si abres el sitio con ?server=https://... usa Ollama en tu PC; con ?server=off vuelve al modo navegador.
 const WEBLLM="https://esm.run/@mlc-ai/web-llm@0.2.86";
 const qs=new URLSearchParams(location.search).get("server");
 if(qs)try{qs==="off"?localStorage.removeItem("lumora_ollama"):localStorage.setItem("lumora_ollama",qs.replace(/\/$/,""));}catch{}
 const OLLAMA=localStorage.getItem("lumora_ollama");
 // Modelos pro-coder (memoria aproximada en GPU). Si uno no entra, baja al siguiente y avisa.
-const B05="Qwen2.5-Coder-0.5B-Instruct",B15="Qwen2.5-Coder-1.5B-Instruct",B7="Qwen2.5-Coder-7B-Instruct",B9="Qwen3.5-9B";
+const B05="Pro2.5-Coder-0.5B-Instruct",B15="Pro2.5-Coder-1.5B-Instruct",B7="Pro2.5-Coder-7B-Instruct",B9="Pro3.5-9B";
 const NAME={[B05]:"pro-coder1",[B15]:"pro-coder2",[B7]:"pro-coder3",[B9]:"pro-coder4"};
 const MODELS={"pro-coder1":[B05],"pro-coder2":[B15,B05],"pro-coder3":[B7,B15,B05],"pro-coder4":[B9,B15,B05]};
 const OLD={ligero:"pro-coder1",equilibrado:"pro-coder2",potente:"pro-coder3",maximo:"pro-coder4"};

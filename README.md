@@ -1,6 +1,6 @@
 # Lumora-AI
 
-Lumora AI es una inteligencia artificial de código abierto que busca ser un asistente eficiente para la creación de código totalmente gratuito e ilimitado.
+Lumora AI es una inteligencia artificial de código disponible que busca ser un asistente eficiente para la creación de código totalmente gratuito e ilimitado.
 
 Usa WebGPU y funciona sin necesidad de conexión a Internet, se divide en 4 modelos llamados 'Pro-coder'.
 

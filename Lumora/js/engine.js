@@ -4,13 +4,17 @@ const WEBLLM="https://esm.run/@mlc-ai/web-llm@0.2.86";
 const qs=new URLSearchParams(location.search).get("server");
 if(qs)try{qs==="off"?localStorage.removeItem("lumora_ollama"):localStorage.setItem("lumora_ollama",qs.replace(/\/$/,""));}catch{}
 const OLLAMA=localStorage.getItem("lumora_ollama");
-// Modelos pro-coder (memoria aproximada en GPU). Si uno no entra, baja al siguiente y avisa.
-const B05="Pro2.5-Coder-0.5B-Instruct",B15="Pro2.5-Coder-1.5B-Instruct",B7="Pro2.5-Coder-7B-Instruct",B9="Pro3.5-9B";
-const NAME={[B05]:"pro-coder1",[B15]:"pro-coder2",[B7]:"pro-coder3",[B9]:"pro-coder4"};
-const MODELS={"pro-coder1":[B05],"pro-coder2":[B15,B05],"pro-coder3":[B7,B15,B05],"pro-coder4":[B9,B15,B05]};
+// IMPORTANTE: estos son los IDs REALES de WebLLM (nombres de archivo del modelo). No los renombres
+// (si cambias "Qwen" por otra palabra el modelo no se encuentra). El nombre visible es pro-coder-vN.
+const Q06="Qwen3-0.6B",Q17="Qwen3-1.7B",Q4="Qwen3-4B",C7="Qwen2.5-Coder-7B-Instruct";
+const NAME={[Q06]:"pro-coder-v1",[Q17]:"pro-coder-v2",[Q4]:"pro-coder-v3",[C7]:"pro-coder-v4"};
+// Si un modelo no entra en tu GPU, baja al siguiente y avisa.
+const MODELS={"pro-coder1":[Q06],"pro-coder2":[Q17,Q06],"pro-coder3":[Q4,Q17,Q06],"pro-coder4":[C7,Q4,Q17]};
 const OLD={ligero:"pro-coder1",equilibrado:"pro-coder2",potente:"pro-coder3",maximo:"pro-coder4"};
 export const getNivel=()=>{const n=localStorage.getItem("lumora_nivel");return MODELS[n]?n:OLD[n]||"pro-coder2";};
 export const setNivel=n=>{try{localStorage.setItem("lumora_nivel",n);}catch{}};
+// Muestreo conservador: poca temperatura = respuestas estables y precisas.
+const TEMP=0.15,TOP_P=0.8,REPEAT=1.08;
 let eng=null,mode="web",create=null,loadedId=null,loadedName=null;
 
 export async function pick(onProgress=()=>{}){
@@ -33,24 +37,32 @@ export async function pick(onProgress=()=>{}){
  throw new Error("No pude cargar el modelo en tu GPU: "+(last&&last.message||last));
 }
 
-export async function stream(model,messages,onTok,signal,onStatus=()=>{}){
+// o.long = true cuando piden código (respuesta más larga); si no, respuestas cortas = más rápidas.
+export async function stream(model,messages,onTok,signal,onStatus=()=>{},o={}){
+ const maxTok=o.long?1400:700;
  if(mode==="web"){
   signal&&signal.addEventListener("abort",()=>eng&&eng.interruptGenerate());
   let got=false;
-  const run=async()=>{
-   const chunks=await eng.chat.completions.create({messages,stream:true,temperature:0.3,top_p:0.9,max_tokens:getNivel()==="pro-coder4"?1800:1200});
+  const run=async(thinkOff)=>{
+   const req={messages,stream:true,temperature:TEMP,top_p:TOP_P,repetition_penalty:REPEAT,max_tokens:maxTok};
+   // Qwen3 piensa por defecto (lento): se desactiva para responder directo.
+   if(thinkOff&&/^Qwen3-/.test(loadedId))req.extra_body={enable_thinking:false};
+   const chunks=await eng.chat.completions.create(req);
    for await(const c of chunks){const t=c.choices[0]&&c.choices[0].delta&&c.choices[0].delta.content;if(t){got=true;onTok(t);}}
   };
-  try{await run();}
+  try{await run(true);}
   catch(e){
+   const m=String(e&&e.message);
+   if(got)throw e;
+   if(/enable_thinking|extra_body/i.test(m)){await run(false);return;}
    // El navegador a veces descarga el modelo de la GPU (inactividad, memoria). Se recarga solo y se reintenta.
-   if(got||!create||!/not loaded|device|lost|reload/i.test(String(e&&e.message)))throw e;
+   if(!create||!/not loaded|device|lost|reload/i.test(m))throw e;
    eng=await create(loadedId,{initProgressCallback:p=>onStatus(`Recargando modelo… ${Math.round((p.progress||0)*100)}%`)});
-   onStatus(loadedName);await run();
+   onStatus(loadedName);await run(true);
   }
   return;
  }
- const r=await fetch(OLLAMA+"/api/chat",{method:"POST",signal,body:JSON.stringify({model,messages,stream:true})});
+ const r=await fetch(OLLAMA+"/api/chat",{method:"POST",signal,body:JSON.stringify({model,messages,stream:true,options:{temperature:TEMP,top_p:TOP_P,repeat_penalty:1.1,num_predict:maxTok}})});
  if(!r.ok)throw new Error(await r.text());
  const rd=r.body.getReader(),dec=new TextDecoder();let buf="",th=false;
  for(;;){

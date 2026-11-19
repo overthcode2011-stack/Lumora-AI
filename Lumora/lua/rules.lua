@@ -1,4 +1,4 @@
--- Reglas de Lumora AI. Solo datos (sin codigo ejecutable). Editalas y haz commit.
+-- Reglas de Lumora AI. Solo datos (sin codigo ejecutable).
 return {
   name = "Lumora AI",
   persona = "Eres una asistente de programación y scripting. Tono cálido, claro y profesional. Respondes en el idioma del usuario.",

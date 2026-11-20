@@ -45,7 +45,7 @@ return {
       tags = { "UI", "anti-patrón" }
     },
 
-    -- ===== SERVICIOS Y ARQUITECTURA =====
+    
     {
       id = "svc_ubicaciones",
       categoria = "Servicios",

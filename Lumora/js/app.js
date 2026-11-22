@@ -6,6 +6,8 @@ import {setDots} from "./dots.js";
 import {menu,globe,ic,esc,toast} from "./ui.js";
 import {quick} from "./fast.js";
 import {webSearch} from "./search.js";
+import {loadDocs,robloxDocs} from "./docs.js";
+import {diagnose} from "./debug.js";
 import {isSiteRequest,siteTopic,sitePrompt,SITE_SCHEMA,buildSite} from "./sitegen.js";
 
 const $=id=>document.getElementById(id);
@@ -140,6 +142,7 @@ async function fetchGitHubContext(text){
 /* ---------- cuánto contexto necesita cada pregunta ---------- */
 const CODE=/\b(crea|crear|haz|hazme|escribe|genera|programa|script|codigo|código|funci[oó]n|ejemplo|arregla|corrige|error|bug|html|css|js|javascript|lua|luau|roblox|python|pagina|página|web|sitio)\b/i;
 const DEF=/^[¿\s]*(qu[eé] es|qu[eé] son|qui[eé]n(es)? (es|son|fue)|cu[aá]l es|define|significa|por qu[eé]|cu[aá]nt[oa]s?)/i;
+const ROBLOX=/\b(roblox|luau|lua|servidor|cliente|server|client|replicatedfirst|localscript|modulescript|remoteevent|playeradded|datastore|humanoid|studio|orden de carga)\b/i;
 const GREET=/^[¡¿\s]*(hola|buenas|buen[oa]s|hey|gracias|ok|vale|adi[oó]s)\b/i;
 const FOLLOW=/\b(eso|esto|esa|ese|esos|esas|anterior|arriba|contin[uú]a|sigue|mej[oó]ralo|corr[ií]gelo|c[aá]mbialo|otra vez|de nuevo|pero|adem[aá]s|y si|el c[oó]digo|ese c[oó]digo|el script|m[aá]s corto|m[aá]s largo)\b/i;
 const MODIFY=/\b(modifica|modificar|edita|editar|cambia|cambiar|c[aá]mbial[oa]|agrega|agregar|a[ñn]ade|a[ñn]adir|quita|quitar|elimina|arregla|arreglar|corrige|corregir|mejora|mejorar|optimiza|refactoriza|convierte|traduce|renombra|actualiza|reemplaza|revisa)\b/i;
@@ -200,7 +203,12 @@ async function generate(){
   // 3) Conversación normal, con razonamiento, internet y archivos si el usuario los pidió
   else{
    let extra="";
-   if(code)extra+=relevant(q)+example(q);
+   const dx=diagnose(q),rbx=ROBLOX.test(q);
+   if(code||rbx||dx)extra+=relevant(dx?q+" error depurar corregir":q)+(code?example(q):"");
+   if(dx)extra+=dx;
+   const rd=await robloxDocs(q,()=>{stage="Leyendo la documentación";setStat(stat,stage,0);});
+   if(rd.text){extra+="\nDOCUMENTACIÓN OFICIAL DE ROBLOX (usa los nombres exactos de métodos y eventos):\n"+rd.text;sources=sources.concat(rd.sources);}
+   stage="";
    const gh=await fetchGitHubContext(q);if(gh)extra+=gh;
    if(web&&q.length>5&&!GREET.test(q)){
     stage="Investigando";setStat(stat,stage,0);
@@ -209,7 +217,7 @@ async function generate(){
    }
    let af=last.file?{name:last.file.name,text:last.file.text}:((MODIFY.test(q)||FOLLOW.test(q))?activeFile(c):null);
    if(think&&!isQwen3())extra+="\nRazona primero dentro de <think>…</think> (máx. 6 frases) y después da la respuesta final.";
-   let maxTok=think?1600:af?1500:code?1200:500;
+   let maxTok=think?1600:af?1500:(code||dx)?1200:500;
    const mkUser=()=>af?"Archivo «"+af.name+"»:\n```"+langOf(af.name)+"\n"+af.text+"\n```\n\n"+q:q;
    const fileNote=()=>af?"\nARCHIVO: "+(tok(af.text)<=1500?"si lo modificas, devuélvelo COMPLETO en un bloque ```"+langOf(af.name)+":"+af.name+".":"es grande: devuelve SOLO las partes cambiadas, cada una en su bloque de código con un comentario que diga dónde va."):"";
    let hist=buildHist(c,standalone),sys=systemPrompt(recall(q),extra+fileNote(),model),user=mkUser();
@@ -324,7 +332,7 @@ $("file").onchange=e=>{attachFile(e.target.files[0]);e.target.value="";};
 $("dev").textContent=device();setTog("tThink",think);setTog("tWeb",web);setSend();
 (async()=>{
  if(!mob()&&ls("lumora_sb")==="0")sb(false);
- await Promise.all([loadRules(),loadMemory(),loadKnowledge()]);show(null);
+ await Promise.all([loadRules(),loadMemory(),loadKnowledge(),loadDocs()]);show(null);
  setDots(false);
  try{model=await pick(x=>setSt(x,""));setSt(model||"Sin modelos",model?"ok":"");}
  catch(e){modelError=e.message;setSt("Sin motor","");show(cur,"No se pudo iniciar el motor: "+modelError);}
